@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A* 알고리즘(A Star Algorithm) 개념 및 실습 시뮬레이터</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">A*</div>
+      <div>
+        <h1 class="brand-title">A* Pathfinding Test Bench</h1>
+        <div class="brand-subtitle">Interactive Simulator based on recall.tistory.com/40</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="https://recall.tistory.com/40" target="_blank" rel="noopener" class="blog-badge">
+        📄 원본 블로그 글 보기 (recall.tistory.com/40)
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    
+    <!-- Left Workspace (Grid + Controls) -->
+    <section class="workspace">
+      
+      <!-- Control Bar Card -->
+      <div class="control-card">
+        
+        <!-- Controls Group 1: Presets & Tools -->
+        <div class="control-group">
+          <label style="font-size: 0.8rem; color: var(--text-muted);">프리셋:</label>
+          <select id="presetSelect" class="select-input"></select>
+
+          <div class="mode-selector">
+            <button id="modeWall" class="mode-btn active" title="장애물 그리기">🧱 장애물</button>
+            <button id="modeStart" class="mode-btn" title="출발지 설정">🟢 출발</button>
+            <button id="modeGoal" class="mode-btn" title="도착지 설정">🔴 도착</button>
+          </div>
+        </div>
+
+        <!-- Controls Group 2: Step Playback -->
+        <div class="control-group">
+          <button id="btnPrev" class="btn btn-secondary">⏮ 이전</button>
+          <button id="btnPlay" class="btn btn-primary">▶ 재생</button>
+          <button id="btnNext" class="btn btn-secondary">다음 ⏭</button>
+          <button id="btnReset" class="btn btn-danger">🔄 초기화</button>
+        </div>
+
+        <!-- Controls Group 3: Algorithm Config -->
+        <div class="control-group">
+          <div class="slider-container">
+            <span>속도:</span>
+            <input type="range" id="speedSlider" min="50" max="1000" value="750">
+            <span id="speedValueLabel" style="font-family: var(--font-mono); font-weight: 600;">300ms</span>
+          </div>
+
+          <label style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">휴리스틱:</label>
+          <select id="heuristicSelect" class="select-input">
+            <option value="manhattan">Manhattan (블로그 방식: |dx|+|dy|×10)</option>
+            <option value="euclidean">Euclidean (직선거리: √(dx²+dy²)×10)</option>
+            <option value="chebyshev">Chebyshev (대각선 최대값)</option>
+          </select>
+
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem;">
+            <input type="checkbox" id="allowDiagonalCheck" checked> 대각선 이동 허용
+          </label>
+        </div>
+
+        <!-- Cost configuration details -->
+        <div class="control-group" style="font-size: 0.8rem; color: var(--text-muted); gap: 0.75rem;">
+          <span>직선 비용: <input type="number" id="straightCostInput" class="number-input" value="10" style="width: 50px;"></span>
+          <span>대각선 비용: <input type="number" id="diagonalCostInput" class="number-input" value="14" style="width: 50px;"></span>
+        </div>
+
+      </div>
+
+      <!-- Grid Board Card -->
+      <div class="grid-card">
+        
+        <!-- Legend Bar -->
+        <div class="legend-bar">
+          <div class="legend-item"><div class="legend-box start"></div> 출발 (Start)</div>
+          <div class="legend-item"><div class="legend-box goal"></div> 도착 (Goal)</div>
+          <div class="legend-item"><div class="legend-box wall"></div> 장애물 (Wall)</div>
+          <div class="legend-item"><div class="legend-box open"></div> 열린 목록 (Open List)</div>
+          <div class="legend-item"><div class="legend-box closed"></div> 닫힌 목록 (Closed List)</div>
+          <div class="legend-item"><div class="legend-box current"></div> 현재 탐색 노드 (Current)</div>
+          <div class="legend-item"><div class="legend-box path"></div> 최단 경로 (Path)</div>
+        </div>
+
+        <!-- Dynamic Grid Canvas -->
+        <div class="grid-wrapper">
+          <div id="gridBoard" class="grid-board"></div>
+        </div>
+
+        <!-- Formula Callout -->
+        <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center;">
+          💡 Each cell displays: <span style="color: #ffffff; font-weight: 700;">Top-Left: f(n)</span> | 
+          <span style="color: #f97316; font-weight: 600;">Bottom-Left: g(n)</span> | 
+          <span style="color: #f43f5e; font-weight: 600;">Bottom-Right: h(n)</span> | 
+          <span style="color: #cbd5e1;">Center Arrow: Parent Pointer</span>
+        </div>
+
+      </div>
+
+      <!-- Blog Algorithm Explanation Card -->
+      <div class="panel-card">
+        <h3 class="panel-title">
+          <span>📚 블로그 알고리즘 핵심 요약 (recall.tistory.com/40)</span>
+          <span class="panel-title-tag">A* Theory</span>
+        </h3>
+        
+        <div class="formula-card">
+          <div class="formula-title">Heuristic Cost Function</div>
+          <code class="formula-code">f(n) = g(n) + h(n)</code>
+          <ul style="margin-left: 1.2rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.3rem;">
+            <li><strong style="color: #f97316;">g(n)</strong>: 출발 노드에서 현재 노드까지의 최단 이동 비용 (직선 10, 대각선 14)</li>
+            <li><strong style="color: #f43f5e;">h(n)</strong>: 현재 노드에서 목표 노드까지의 예상 이동 비용 (대각선 제외 가로/세로 이동거리 × 10)</li>
+            <li><strong style="color: #06b6d4;">f(n)</strong>: 총 이동 비용 f(n) = g(n) + h(n). 열린 목록 중 f(n)이 가장 작은 노드를 우선 선택</li>
+            <li><strong style="color: #cbd5e1;">화살표(Pointer)</strong>: 부모 노드(Parent node)를 가리켜, 목표 노드 도착 시 시작 노드까지 거슬러 올라가 최단 경로 도출</li>
+          </ul>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Sidebar Inspector Panel -->
+    <aside class="sidebar-panel">
+      
+      <!-- Step Execution Stats -->
+      <div class="panel-card">
+        <h3 class="panel-title">
+          <span>실행 현황</span>
+          <span class="panel-title-tag">Metrics</span>
+        </h3>
+        
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div id="statStepCount" class="stat-value">0 / 0</div>
+            <div class="stat-label">탐색 단계 (Step)</div>
+          </div>
+          <div class="stat-box">
+            <div id="statOpenCount" class="stat-value" style="color: var(--color-open-border);">0</div>
+            <div class="stat-label">열린 목록 (Open)</div>
+          </div>
+          <div class="stat-box">
+            <div id="statClosedCount" class="stat-value" style="color: var(--color-closed-border);">0</div>
+            <div class="stat-label">닫힌 목록 (Closed)</div>
+          </div>
+        </div>
+
+        <div class="stat-box" style="margin-top: 0.5rem;">
+          <div id="statPathCost" class="stat-value" style="color: var(--accent-amber);">—</div>
+          <div class="stat-label">최단 경로 총 비용 f(n)</div>
+        </div>
+      </div>
+
+      <!-- Cell Detail Inspector -->
+      <div class="panel-card">
+        <h3 class="panel-title">
+          <span>셀 상세 수치 분석</span>
+          <span class="panel-title-tag">Inspector</span>
+        </h3>
+        <div id="cellDetailCard">
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            격자 마우스를 올리면 해당 셀의 g(n), h(n), f(n) 상세 수학적 계산 과정이 표시됩니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Log Box -->
+      <div class="panel-card">
+        <h3 class="panel-title">
+          <span>단계별 실행 로그</span>
+          <span class="panel-title-tag">Step Log</span>
+        </h3>
+        <div id="logBox" class="log-box"></div>
+      </div>
+
+      <!-- Live Open/Closed List Tables -->
+      <div class="panel-card">
+        <h3 class="panel-title">
+          <span>열린 목록 & 닫힌 목록</span>
+          <span class="panel-title-tag">Live Lists</span>
+        </h3>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-open-border); margin-bottom: 0.4rem;">
+              • 열린 목록 (Open List) - f(n) 오름차순 정렬
+            </div>
+            <div class="table-container">
+              <table id="openListTable" class="list-table">
+                <thead>
+                  <tr>
+                    <th>좌표(x,y)</th>
+                    <th>f(n)</th>
+                    <th>g(n)</th>
+                    <th>h(n)</th>
+                    <th>부모</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-closed-border); margin-bottom: 0.4rem;">
+              • 닫힌 목록 (Closed List)
+            </div>
+            <div class="table-container">
+              <table id="closedListTable" class="list-table">
+                <thead>
+                  <tr>
+                    <th>좌표(x,y)</th>
+                    <th>f(n)</th>
+                    <th>g(n)</th>
+                    <th>h(n)</th>
+                    <th>부모</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Scripts -->
+  <script src="/static/js/astar.js"></script>
+  <script src="/static/js/presets.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
